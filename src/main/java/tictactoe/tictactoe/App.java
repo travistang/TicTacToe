@@ -95,7 +95,6 @@ public class App
     
     public boolean checkWin()
     {
-    	//TODO: this
     	for(int i = 0; i < 3; i++)
     	{
     		if(data[i][0] == data[i][1] && data[i][1] == data[i][2] && data[i][2] != '_')
