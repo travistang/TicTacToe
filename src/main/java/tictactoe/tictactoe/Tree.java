@@ -38,6 +38,10 @@ public class Tree<T> {
     {
     	return children;
     }
+    public void setChildren(List<Tree<T>> c)
+    {
+    	children = c;
+    }
     public T getData()
     {
     	return data;

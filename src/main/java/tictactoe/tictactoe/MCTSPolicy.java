@@ -1,5 +1,17 @@
 package tictactoe.tictactoe;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.SparkConf;
+
 public class MCTSPolicy implements Policy{
 
 	/**
@@ -9,6 +21,9 @@ public class MCTSPolicy implements Policy{
 	 */
 	private Tree<Data> tree;
 	private final char rep;
+	private float uctConstant;
+	private int simulationTimes = 10000;
+	private int nodesConsider = 500;
 	private class Data
 	{
 		char[][] board;
@@ -21,24 +36,51 @@ public class MCTSPolicy implements Policy{
 			this.prob = prob;
 			this.visitedTimes = 0;
 		}
-		
+		/**
+		 * Note: Do not call this function unless you are in selection state..
+		 * ( This affects the UCT score of the particular node owning this data )
+		 */
 		public void visit()
 		{
 			visitedTimes++;
 		}
-		
 	}
 
+	public void setNodesToConsider(int i)
+	{
+		nodesConsider = i;
+	}
+	
+	public void setSimulationTimes(int i)
+	{
+		simulationTimes = i;
+	}
 	public MCTSPolicy(char rep)
 	{
+		this(rep,1);
+	}
+	
+	public MCTSPolicy(char rep,float uctConstant)
+	{
 		this.rep = rep;
+		this.uctConstant = uctConstant;
+	}
+	
+	public void setUCTConstant(float c)
+	{
+		uctConstant = c;
+	}
+	
+	public float getUCTConstant()
+	{
+		return uctConstant;
 	}
 	
 	@Override
 	public int[] decide(char[][] board) {
-		// TODO this is the most interesting part
-		// try standard MCTS Algorithm, then use Spark to solve it.
-		// at the end check if it's actually faster (which is a trivial result..)
+		// TODO try standard MCTS Algorithm, then use Spark to solve it.
+		// TODO at the end check if it's actually faster (which is a trivial result..)
+		
 		// after this function there should be at least one child under the root.
 		mcts();
 		char nextBoard[][] = bestChildren(tree).getData().board;
@@ -63,64 +105,102 @@ public class MCTSPolicy implements Policy{
 	}
 
 	/**
-	 * Play-out
-	 * @param board
-	 * @param x
-	 * @param y
-	 * @param representation
-	 * @return
-	 */
-	private char[][] play(char[][] board,int x, int y,char representation)
-	{
-		if(x < 0 || x > 2 || y < 0 || y > 2)
-			throw new IllegalArgumentException("invalid index");
-		if(representation != 'X' && representation != 'Y')
-			throw new IllegalArgumentException("Invalid representation");
-		if(board[x][y] != '_')
-			throw new IllegalArgumentException("Coordinate specified is occupied");
-		
-		board[x][y] = representation;
-		return board;
-	}
-	/**
 	 * main algorithm
 	 */
 	private void mcts()
 	{
-		
-	}
-	// first stage
-	private float select(Tree<Data> node, int lv)
-	{
-		if(lv < 0) 
-			throw new IllegalArgumentException("The required number of level "
-					+ "to be explored under given node must be a positive integer");
-		float prob = node.getData().prob;
-		
-		return prob;
-	}
-	private void expand(Tree<Data> node,int lv)
-	{
-	
-	}
-	/*
-	 * 
-	 */
-	private void updateProbability(Tree<Data> node)
-	{
-		Tree<Data> next;
-		float curProb = 0;
-		for(Tree<Data> child : node.getChildren())
+		for(int i = 0; i < this.nodesConsider; i++)
 		{
-			float p;
-			if((p = child.getData().prob) > curProb)
+			//1. selection
+			Tree<Data> selectedStage = tree;
+			while(!selectedStage.getChildren().isEmpty())
 			{
-				next = child;
-				curProb = p;
+				selectedStage = select(selectedStage);
+			}
+			
+			//2. expansion
+			// this add all possible stages to the selected Stage, which should not exceed 9...
+			this.expand(selectedStage);
+			
+			//3. Simulation
+			float prob = this.simulate(selectedStage, this.simulationTimes);
+			//4. back propagation
+			selectedStage.getData().prob = prob;
+			// back-up to the front
+			while(selectedStage != tree)
+			{
+				prob = selectedStage.getData().prob;
+				selectedStage = selectedStage.getParent(); // this traverse back to the tree
+				float oldProb = selectedStage.getData().prob;
+				int times = selectedStage.getData().visitedTimes;
+				selectedStage.getData().prob = (oldProb * times + prob) / (oldProb + 1);
 			}
 		}
-		
 	}
+	// first stage
+	private Tree<Data> select(Tree<Data> node)
+	{
+		// according to https://www.youtube.com/watch?v=Yf8vKTIQzHs
+		if(node.getData().visitedTimes == 0) return node;
+	
+		float score = 0;
+		// select the first children by default
+		Tree<Data> select = node.getChildren().get(0);
+	
+		for(Tree<Data> n : node.getChildren())
+		{
+			if(n.getData().visitedTimes == 0) return n;
+			float s = uct(n);
+			if(s > score)
+			{
+				score = s;
+				select = n;
+			}
+		}
+		// mark the selected state as visited. This helps in uct calculation
+		select.getData().visit();
+		return select;
+	}
+	/**
+	 * Evaluate the UCT of a node.
+	 * Reference: https://www.youtube.com/watch?v=Yf8vKTIQzHs
+	 * @param node
+	 * @return UCT of a node
+	 */
+	private float uct(Tree<Data> node)
+	{
+		int np = node.getData().visitedTimes;
+		int ni = node.getParent().getData().visitedTimes;
+		return (float) (node.getData().prob + uctConstant * Math.sqrt(Math.log(np)/ni));
+	}
+	
+	// explore the given node by one level
+	// use it for expansion ONCE, then just randomly pick a 
+	private void expand(Tree<Data> node)
+	{
+		//1. get a list of all legal moves
+		char[][] board = node.getData().board;
+		ArrayList<char[][]> legalMoves = new ArrayList<char[][]>();
+		
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				if(board[i][j] == '_')
+				{
+					char[][] move = board.clone();
+					move[i][j] = rep;
+					legalMoves.add(move);
+				}
+			}
+		}
+		node.setChildren(
+				legalMoves.stream()
+				.map(b -> new Tree<Data>(node,new Data(b,0)))
+				.collect(Collectors.toList())
+				);
+	}
+
 	// exploitation, also used to tell the decision from the move
 	private Tree<Data> bestChildren(Tree<Data> n)
 	{
@@ -136,6 +216,84 @@ public class MCTSPolicy implements Policy{
 		}
 		return res;
 	}
+
+	// randomly visit states starting from given state n until it comes to an end.
+	private float simulate(Tree<Data> n, int times)
+	{
+		if( times <= 0 ) 
+			throw new IllegalArgumentException(
+					"The number of times to simulate should be a positive integer");
+		int winCount = 0;
+		Tree<Data> state = n;
+		char curRep = this.rep;
+		for(int i = 0; i < times; i++)
+		{
+			while(!hasEnded(state))
+			{
+				state = randomNextState(state,curRep);
+				curRep = (curRep == 'O')?'X':'O';
+			}
+			if(opponentWins(state)) winCount--;
+			else winCount++;
+		}
+		return winCount / times;
+	}
+	
+	private boolean opponentWins(Tree<Data> n)
+	{
+		char c = getWinner(n);
+		if(c == '_') throw new IllegalArgumentException("Game needs to be ended in order to tell who the winner is");
+		return c != this.rep;
+	}
+	
+	private static boolean hasEnded(Tree<Data> n)
+	{
+		return getWinner(n) != '_';
+	}
+	// get a representation that wins the game
+	private static char getWinner(Tree<Data> n)
+	{
+		char[][] data = n.getData().board;
+    	for(int i = 0; i < 3; i++)
+    	{
+    		if(data[i][0] == data[i][1] && data[i][1] == data[i][2] && data[i][2] != '_')
+    		{
+    			return data[i][1];
+    		}
+    		if(data[0][i] == data[1][i] && data[1][i] == data[2][i] && data[2][i] != '_')
+    		{
+    			return data[1][i];
+    		}
+    	}
+    	if(data[0][0] == data[1][1] && data[1][1] == data[2][2] && data[1][1] != '_') return data[1][1];
+    	if(data[0][2] == data[1][1] && data[1][1] == data[2][0] && data[1][1] != '_') return data[1][1];
+		return '_';
+	}
+	/**
+	 * Randomly play out the given state n with 'rep' as 'representation' 
+	 * @param state
+	 * @return
+	 */
+	private Tree<Data> randomNextState(Tree<Data> state,char rep)
+	{
+		if(rep != 'O' && rep != 'X') 
+			throw new IllegalArgumentException("Invalid representation");
+		if(hasEnded(state)) 
+			throw new IllegalArgumentException("A terminated state has no next state");
+		
+		Random r = new Random();
+		
+		int x = 0,y = 0;
+		do
+		{
+			x = r.nextInt(3);
+			y = r.nextInt(3);
+		}while(state.getData().board[x][y] != '_');
+		
+		state.getData().board[x][y] = rep;
+		return state;	
+	}
+	
 	public float currentWinningProbability()
 	{
 		return tree.getData().prob;
@@ -150,12 +308,4 @@ public class MCTSPolicy implements Policy{
 				new Data(curboard,currentWinningProbability()));
 	}
 	
-	private boolean isTerminalNode(Tree<Data> n)
-	{
-		char[][] board = n.getData().board;
-		for(int i = 0; i < 3; i++)
-			for(int j = 0; j < 3; j++)
-				if(board[i][j] == '_') return false;
-		return true;
-	}
 }
