@@ -307,5 +307,29 @@ public class MCTSPolicy implements Policy{
 		tree = new Tree<Data>(
 				new Data(curboard,currentWinningProbability()));
 	}
-	
+	/**
+	 * The method below are used for unit-testing the private methods
+	 * TODO remove the methods below after the testing
+	 */
+	public void expandTest(Tree<Data> node)
+	{
+		expand(node);
+		
+	}
+	public char getRep()
+	{
+		return rep;
+	}
+	public Tree<Data> randomNextStateTest(Tree<Data> state,char rep)
+	{
+		return randomNextState(state,rep);
+	}
+	public static char getWinnerTest(Tree<Data> board)
+	{
+		return getWinner(board);
+	}
+	public Tree<Data> getRoot()
+	{
+		return tree;
+	}
 }
