@@ -34,7 +34,7 @@ public class App
 	public void run()
 	{
 		int[] coord;
-		while(!this.checkWin())
+		while(!this.isGameEnded())
 		{
 			// A's turn
 			show();
@@ -51,8 +51,16 @@ public class App
 			coord = getCoord(pb);
 			data[coord[0]][coord[1]] = pb.representation;
 		}
-		System.out.println("Player " + pb.name + "wins");
-		show();
+		if(checkWin()) // B wins at the end
+		{
+			System.out.println("Player " + pb.name + "wins");
+			
+		}else // draw
+		{
+			System.out.println("Draw!");
+			show();
+		}
+		
 	}
 	/**
 	 * Make sure this is used only when the board is not filled. Otherwise this results in an infinite loop...
@@ -109,5 +117,19 @@ public class App
     	if(data[0][2] == data[1][1] && data[1][1] == data[2][0] && data[1][1] != '_') return true;
     	return false;
     }
-    
+    public boolean isFull()
+    {
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				if(data[i][j] == '_') return false;
+			}
+		}
+		return true;
+    }
+    public boolean isGameEnded()
+    {
+    	return checkWin() || isFull();
+    }
 }
