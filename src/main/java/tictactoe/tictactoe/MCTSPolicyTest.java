@@ -23,17 +23,26 @@ public class MCTSPolicyTest {
 	 * @param board
 	 * @param x
 	 * @param y
-	 * @return
+	 * @return the same board instance in param
 	 */
 	public char[][] move(char[][] board,char tile,int x,int y)
 	{
+		Tree<Data> n = treeByBoard(board);
 		if(tile != 'X' || tile != 'O')
 			throw new IllegalArgumentException("The tile to be put should be either 'X' or 'O'");
 		if(x < 0 || y < 0 || x > 2 || y > 2) 
 			throw new IllegalArgumentException("The given Coordinates are invalid");
-		if(MCTSPolicy.hasEnded(treeByBoard(board)))
-			throw new IllegalArgumentException("No moves can be made on the given board as it is full already");
+		if(MCTSPolicy.hasEnded(n))
+			throw new IllegalArgumentException("No (illegal) moves can be made on the given board as it is full already");
+		if(board[x][y] != '_')
+			throw new IllegalArgumentException("The given coordinates are occpuied");
+		board[x][y] = tile;
+		return board;
 	}
+	/**
+	 * Get a random board by putting tiles randomly on the board.
+	 * @return a random board
+	 */
 	public char[][] randomBoard()
 	{
 		Random r = new Random();
