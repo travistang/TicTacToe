@@ -8,6 +8,8 @@ import java.util.Random;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import javax.management.RuntimeErrorException;
+
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.SparkConf;
@@ -24,7 +26,14 @@ public class MCTSPolicy implements Policy{
 	private float uctConstant;
 	private int simulationTimes = 10000;
 	private int nodesConsider = 500;
-	private class Data
+	
+	private static final char emptyBoard[][] = 
+	{
+		{'_','_','_'},
+		{'_','_','_'},
+		{'_','_','_'}
+	};
+	public static class Data
 	{
 		char[][] board;
 		// probability of the one who adopts this policy wins the game
@@ -36,6 +45,10 @@ public class MCTSPolicy implements Policy{
 			this.prob = prob;
 			this.visitedTimes = 0;
 		}
+		public Data(char[][] board)
+		{
+			this(board,0.5f);
+		}
 		/**
 		 * Note: Do not call this function unless you are in selection state..
 		 * ( This affects the UCT score of the particular node owning this data )
@@ -43,6 +56,11 @@ public class MCTSPolicy implements Policy{
 		public void visit()
 		{
 			visitedTimes++;
+		}
+		@Override
+		public String toString()
+		{
+			return "prob:" + prob + " times:" + visitedTimes;
 		}
 	}
 
@@ -64,6 +82,7 @@ public class MCTSPolicy implements Policy{
 	{
 		this.rep = rep;
 		this.uctConstant = uctConstant;
+		this.tree = new Tree<Data>(new Data(emptyBoard));
 	}
 	
 	public void setUCTConstant(float c)
@@ -81,20 +100,32 @@ public class MCTSPolicy implements Policy{
 		// TODO try standard MCTS Algorithm, then use Spark to solve it.
 		// TODO at the end check if it's actually faster (which is a trivial result..)
 		
+		// update the root first
+		// this will empty the tree so that a new search tree is constructed for the next move..
+		this.updateRoot(board);
 		// after this function there should be at least one child under the root.
-		mcts();
-		char nextBoard[][] = bestChildren(tree).getData().board;
-		char curBoard[][] = tree.getData().board;
-		/**
-		 * figure out where the next move should be
-		 */
+		// perform the mcts algorithm and 
+		//(hopefully it will) return the coordinates for the next move
+		return mcts(board);
+	}
+	
+	/**
+	 * get the coordinate on which the two tiles on the corresponding are different.
+	 * this assumes that there one different tile between the board or they are the same
+	 * If there are more than one differences on the board the first one found will be returned. 
+	 * @param ba the first board
+	 * @param bb the second board
+	 * @return the coordinates of which the difference lies on. This can be null
+	 */
+	private static int[] getBoardDifference(char[][] ba, char[][] bb)
+	{
 		for(int i = 0; i < 3; i++)
 		{
 			for(int j = 0; j < 3; j++)
 			{
-				if(curBoard[i][j] != nextBoard[i][j])
+				if(ba[i][j] == bb[i][j])
 				{
-					int[] res = new int[2];
+					int res[] = new int[2];
 					res[0] = i;
 					res[1] = j;
 					return res;
@@ -103,16 +134,19 @@ public class MCTSPolicy implements Policy{
 		}
 		return null;
 	}
-
 	/**
 	 * main algorithm
+	 * TODO: there's probably something wrong with the visit counts.
+	 * TODO: there may also be something wrong with the rule of selecting nodes
 	 */
-	private void mcts()
+	private int[] mcts(char[][] board)
 	{
+
 		for(int i = 0; i < this.nodesConsider; i++)
 		{
 			//1. selection
 			Tree<Data> selectedStage = tree;
+			tree.print();
 			while(!selectedStage.getChildren().isEmpty())
 			{
 				selectedStage = select(selectedStage);
@@ -123,25 +157,33 @@ public class MCTSPolicy implements Policy{
 			this.expand(selectedStage);
 			
 			//3. Simulation
-			float prob = this.simulate(selectedStage, this.simulationTimes);
-			//4. back propagation
-			selectedStage.getData().prob = prob;
-			// back-up to the front
-			while(selectedStage != tree)
+			for(Tree<Data> child : selectedStage.getChildren())
 			{
-				prob = selectedStage.getData().prob;
-				selectedStage = selectedStage.getParent(); // this traverse back to the tree
-				float oldProb = selectedStage.getData().prob;
-				int times = selectedStage.getData().visitedTimes;
-				selectedStage.getData().prob = (oldProb * times + prob) / (oldProb + 1);
+				float prob = this.simulate(child, this.simulationTimes);
+				child.getData().prob = prob;
+				child.getData().visit();
 			}
+			//4. back propagation
+			// back-up to the front
+			backPropagate(selectedStage);
 		}
+		// final decision
+		Tree<Data> des = bestChildren(tree);
+		int[] res = getBoardDifference(des.getData().board,tree.getData().board);
+		if(res == null)
+			throw new RuntimeErrorException(null, "the MCTS algorithm is unable to give a decision");
+		return res;
+		
 	}
 	// first stage
 	private Tree<Data> select(Tree<Data> node)
 	{
 		// according to https://www.youtube.com/watch?v=Yf8vKTIQzHs
-		if(node.getData().visitedTimes == 0) return node;
+		if(node.getData().visitedTimes == 0)
+		{
+			node.getData().visit();
+			return node;
+		}
 	
 		float score = 0;
 		// select the first children by default
@@ -149,7 +191,11 @@ public class MCTSPolicy implements Policy{
 	
 		for(Tree<Data> n : node.getChildren())
 		{
-			if(n.getData().visitedTimes == 0) return n;
+			if(n.getData().visitedTimes == 0)
+			{
+				n.getData().visit();
+				return n;
+			}
 			float s = uct(n);
 			if(s > score)
 			{
@@ -245,12 +291,54 @@ public class MCTSPolicy implements Policy{
 		if(c == '_') throw new IllegalArgumentException("Game needs to be ended in order to tell who the winner is");
 		return c != this.rep;
 	}
+	/**
+	 * Some truths for the following boolean functions:
+	 * 	1. hasEnded = getWinner || isFull
+	 * 	2. !hasEnded = !getWinner && !isFull
+	 * 	3. getWinner == hasEnded
+	 * 	4. getWinner != isFull
+	 * 	5. !getWinner != !isFull
+	 */
 	
-	private static boolean hasEnded(Tree<Data> n)
+	/**
+	 * Check if the board associated to the given node has ended.
+	 * If a game has ended, either there is a player who wins the game(hasWinner) or the board is full(isFull).
+	 * @param n
+	 * @return
+	 */
+	public static boolean hasEnded(Tree<Data> n)
 	{
-		return getWinner(n) != '_';
+		return getWinner(n) != '_' || isFull(n);
+	}
+	
+	/**
+	 * Check if the board associated to the given node is full
+	 * Note that a full board does not necessary mean there is a winner.
+	 * It can be a draw...
+	 * @param n
+	 * @return
+	 */
+	public static boolean isFull(Tree<Data> n)
+	{
+		char[][] board = n.getData().board;
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				if(board[i][j] == '_') return false;
+			}
+		}
+		return true;
 	}
 	// get a representation that wins the game
+	/**
+	 * The function returns non-'_' only if one of the player wins
+	 * If '_' is returned, it could be:
+	 * 	1. the board is full (can be properly checked by isFull)
+	 * 	2. the game is on-going( means isFull returns false and this function returns '_')
+	 * @param n
+	 * @return
+	 */
 	private static char getWinner(Tree<Data> n)
 	{
 		char[][] data = n.getData().board;
@@ -268,6 +356,29 @@ public class MCTSPolicy implements Policy{
     	if(data[0][0] == data[1][1] && data[1][1] == data[2][2] && data[1][1] != '_') return data[1][1];
     	if(data[0][2] == data[1][1] && data[1][1] == data[2][0] && data[1][1] != '_') return data[1][1];
 		return '_';
+	}
+	// evaluate the probability of winning given node.
+	// Then return the parent of the node
+	private Tree<Data> updateWinningProb(Tree<Data> n)
+	{			
+		int totalTimes = n.getData().visitedTimes;
+		float total = n.getData().prob * totalTimes;
+		for(Tree<Data> child : n.getChildren())
+		{
+			int times = child.getData().visitedTimes;
+			totalTimes += times;
+			total += child.getData().prob * times;
+		}
+		n.getData().prob = total/totalTimes;
+		return n.getParent();
+	}
+	// backpropagation for the mcts algorithm
+	private void backPropagate(Tree<Data> n)
+	{
+		while(n != null)
+		{
+			n = updateWinningProb(n);
+		}
 	}
 	/**
 	 * Randomly play out the given state n with 'rep' as 'representation' 
@@ -307,10 +418,23 @@ public class MCTSPolicy implements Policy{
 		tree = new Tree<Data>(
 				new Data(curboard,currentWinningProbability()));
 	}
-	/**
+	public void updateRoot(Tree<Data> n)
+	{
+		tree = n;
+	}
+	/****************************************************
+	 *
+	 * 
+	 * 
+	 * 
 	 * The method below are used for unit-testing the private methods
 	 * TODO remove the methods below after the testing
-	 */
+	 *
+	 *
+	 *
+	 *
+	 *
+	 ****************************************************/
 	public void expandTest(Tree<Data> node)
 	{
 		expand(node);
@@ -332,4 +456,21 @@ public class MCTSPolicy implements Policy{
 	{
 		return tree;
 	}
+	public Tree<Data> bestChildrenTest(Tree<Data> n)
+	{
+		return bestChildren(n);
+	}
+	public boolean opponentWinsTest(Tree<Data> n)
+	{
+		return opponentWins(n);
+	}
+	public float simulateTest(Tree<Data> n,int times)
+	{
+		return simulate(n,times);
+	}
+	public float uctTest(Tree<Data> n)
+	{
+		return uct(n);
+	}
+	
 }

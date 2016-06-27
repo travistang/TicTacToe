@@ -7,7 +7,7 @@ public class App
 	public static final char X = 'X';
 	public static final char O = 'O';
 	public static final char _ = '_';
-    
+     
 	char data[][] = new char[3][3];
     App()
     {
@@ -26,7 +26,9 @@ public class App
 		
         App game = new App();
         game.addPlayer(new HumanPlayer("A",'X'));
-        game.addPlayer(new AIPlayer("B",'O'));
+        AIPlayer ai = new AIPlayer("B",'O');
+        ai.adoptMCTSPolicy();
+        game.addPlayer(ai);
         game.run();
     }
 	public void run()
