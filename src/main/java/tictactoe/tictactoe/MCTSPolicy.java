@@ -280,11 +280,17 @@ public class MCTSPolicy implements Policy{
 				curRep = (curRep == 'O')?'X':'O';
 			}
 			if(opponentWins(state)) winCount--;
-			else winCount++;
+			else if(iWin(state)) winCount++;
+			//else do nothing
 		}
 		return winCount / times;
 	}
-	
+	private boolean iWin(Tree<Data> n)
+	{
+		char c = getWinner(n);
+		if(c == '_') throw new IllegalArgumentException("Game needs to be ended in order to tell who the winner is");
+		return c == this.rep;
+	}
 	private boolean opponentWins(Tree<Data> n)
 	{
 		char c = getWinner(n);
