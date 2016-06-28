@@ -156,7 +156,12 @@ public class MCTSPolicy implements Policy{
 		}
 	
 		float score = 0;
-		// select the first children by default
+		// prevent an exception from being thrown
+		// when the given node is actually a leaf of the tree
+		// ( this should not happen though )
+		if(node.getChildren().isEmpty())
+			return node;
+		// select the best children if there is any..
 		Tree<Data> select = node.getChildren().get(0);
 	
 		for(Tree<Data> n : node.getChildren())
@@ -177,6 +182,7 @@ public class MCTSPolicy implements Policy{
 		select.getData().visit();
 		return select;
 	}
+	
 	/**
 	 * Evaluate the UCT of a node.
 	 * Reference: https://www.youtube.com/watch?v=Yf8vKTIQzHs
@@ -191,7 +197,8 @@ public class MCTSPolicy implements Policy{
 	}
 	
 	// explore the given node by one level
-	// use it for expansion ONCE, then just randomly pick a 
+	// use it for expansion ONCE, then move forward to the simulation step
+	// all of the children should then be simulated in order to obtain a proper winning probability
 	private void expand(Tree<Data> node)
 	{
 		//1. get a list of all legal moves
@@ -217,7 +224,7 @@ public class MCTSPolicy implements Policy{
 				);
 	}
 
-	// exploitation, also used to tell the decision from the move
+	// exploitation, also used for decision making 
 	private Tree<Data> bestChildren(Tree<Data> n)
 	{
 		Tree<Data> res = null;
@@ -396,11 +403,11 @@ public class MCTSPolicy implements Policy{
 	public void updateRoot(char[][] curboard)
 	{
 		tree = new Tree<Data>(
-				new Data(curboard,currentWinningProbability()));
+				new Data(curboard.clone(),0));
 	}
-	public void updateRoot(Tree<Data> n)
+	public void updateRoot(Tree<Data> n) throws CloneNotSupportedException
 	{
-		tree = n;
+		tree = treeByTree(n);
 	}
 	public Tree<Data> treeByTree(Tree<Data> n) throws CloneNotSupportedException
 	{
@@ -456,6 +463,10 @@ public class MCTSPolicy implements Policy{
 	public float uctTest(Tree<Data> n)
 	{
 		return uct(n);
+	}
+	public Tree<Data> selectTest(Tree<Data> n)
+	{
+		return select(n);
 	}
 	
 }
