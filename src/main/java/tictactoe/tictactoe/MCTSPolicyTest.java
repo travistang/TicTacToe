@@ -12,11 +12,17 @@ import tictactoe.tictactoe.MCTSPolicy.*;
 public class MCTSPolicyTest {
 
 	MCTSPolicy policy;
-	final char[][] emptyBoard = 
+	char[][] emptyBoard() 
 	{
-			{'_','_','_'},
-			{'_','_','_'},
-			{'_','_','_'}
+		char[][] res = new char[3][3];
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				res[i][j] = '_';
+			}
+		}
+		return res;
 	};
 	/**
 	 * Place one tile on the given coordinate 
@@ -25,7 +31,7 @@ public class MCTSPolicyTest {
 	 * @param y
 	 * @return the same board instance in param
 	 */
-	public char[][] move(char[][] board,char tile,int x,int y)
+	public void move(char[][] board,char tile,int x,int y)
 	{
 		Tree<Data> n = treeByBoard(board);
 		if(tile != 'X' && tile != 'O')
@@ -37,7 +43,6 @@ public class MCTSPolicyTest {
 		if(board[x][y] != '_')
 			throw new IllegalArgumentException("The given coordinates are occpuied");
 		board[x][y] = tile;
-		return board;
 	}
 	public int countTile(char[][] board,char tile)
 	{
@@ -56,7 +61,7 @@ public class MCTSPolicyTest {
 	public char[][] randomBoard()
 	{
 		Random r = new Random();
-		char[][] board = emptyBoard.clone();
+		char[][] board = emptyBoard();
 		int numTiles = r.nextInt(4);
 		for(int i = 0; i < numTiles; i++)
 		{
@@ -76,7 +81,7 @@ public class MCTSPolicyTest {
 	
 	public Tree<Data> emptyTree()
 	{
-		return new Tree<Data>(new Data(emptyBoard.clone(),'X'));
+		return new Tree<Data>(new Data(emptyBoard(),'X'));
 	}
 	
 	//some other helper functions
@@ -98,27 +103,28 @@ public class MCTSPolicyTest {
 	@Test
 	public void testUpdateRoot()
 	{
-		char[][] board = emptyBoard.clone();
+		char[][] board = emptyBoard();
 		policy.updateRoot(board);
 		move(policy.getRoot().getData().board,'X',0,0);
 		assertEquals("the update root should get a clone of board instead of the reference of board",
-				9,countTile(policy.getRoot().getData().board,'_'));
+				9,countTile(board,'_'));
 	}
 	@Test
 	public void testSimulate()
 	{
 		int times = 10000;
-		char[][] board = emptyBoard.clone();
+		char[][] board = emptyBoard();
 		move(board, 'X',0,0);
 		move(board,'O',0,1);
 		move(board,'X',1,0);
+		int slot = countTile(board,'_');
 		for(int i = 0 ; i < 10; i++)
 		{
 			float prob = policy.simulateTest(treeByBoard(board), times);
 			assertTrue(0 < prob && prob < 1);
 		}
 		assertTrue("simulation does not alter the original board"
-				,this.countTile(board, '_') == 9);
+				,this.countTile(board, '_') == slot);
 	}
 	@Test
 	public void testDecide() {
@@ -138,7 +144,7 @@ public class MCTSPolicyTest {
 	@Test
 	public void testBackPropagate()
 	{
-		char board[][] = this.emptyBoard.clone();
+		char board[][] = this.emptyBoard();
 		char x = 'X',o = 'O';
 		move(board,x,0,0);
 		move(board,o,1,0);
@@ -151,7 +157,7 @@ public class MCTSPolicyTest {
 	@Test
 	public void testExpand()
 	{
-		policy.updateRoot(this.emptyBoard);
+		policy.updateRoot(this.emptyBoard());
 		policy.expandTest(policy.getRoot());
 		assertEquals("expand test on empty board",9,policy.getRoot().getChildren().size());
 		char[][] board = this.randomBoard();
@@ -164,7 +170,7 @@ public class MCTSPolicyTest {
 	@Test
 	public void testSelect()
 	{
-		policy.updateRoot(this.emptyBoard);
+		policy.updateRoot(this.emptyBoard());
 		Tree<Data> select = policy.selectTest(policy.getRoot());
 		assertEquals("selection on a tree with one node",
 				select,policy.getRoot());

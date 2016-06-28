@@ -402,8 +402,16 @@ public class MCTSPolicy implements Policy{
 	 */
 	public void updateRoot(char[][] curboard)
 	{
+		char[][] board = new char[3][3];
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				board[i][j] = curboard[i][j];
+			}
+		}
 		tree = new Tree<Data>(
-				new Data(curboard.clone(),0));
+				new Data(board,0));
 	}
 	public void updateRoot(Tree<Data> n) throws CloneNotSupportedException
 	{
@@ -411,7 +419,17 @@ public class MCTSPolicy implements Policy{
 	}
 	public Tree<Data> treeByTree(Tree<Data> n) throws CloneNotSupportedException
 	{
-		Tree<Data> res = new Tree<Data>((Data)n.getData().clone());
+		char[][] board = new char[3][3];
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				board[i][j] = n.getData().board[i][j];
+			}
+		}
+		Tree<Data> res = new Tree<Data>(new Data(board,0));
+		res.getData().prob = n.getData().prob;
+		res.getData().visitedTimes = n.getData().visitedTimes;
 		return res;
 	}
 	/****************************************************
