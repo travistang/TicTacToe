@@ -33,36 +33,6 @@ public class MCTSPolicy implements Policy{
 		{'_','_','_'},
 		{'_','_','_'}
 	};
-	public static class Data
-	{
-		char[][] board;
-		// probability of the one who adopts this policy wins the game
-		float prob;
-		int visitedTimes;
-		public Data(char[][] board,float prob)
-		{
-			this.board = board;
-			this.prob = prob;
-			this.visitedTimes = 0;
-		}
-		public Data(char[][] board)
-		{
-			this(board,0.5f);
-		}
-		/**
-		 * Note: Do not call this function unless you are in selection state..
-		 * ( This affects the UCT score of the particular node owning this data )
-		 */
-		public void visit()
-		{
-			visitedTimes++;
-		}
-		@Override
-		public String toString()
-		{
-			return "prob:" + prob + " times:" + visitedTimes;
-		}
-	}
 
 	public void setNodesToConsider(int i)
 	{
@@ -262,7 +232,6 @@ public class MCTSPolicy implements Policy{
 		}
 		return res;
 	}
-
 	// randomly visit states starting from given state n until it comes to an end.
 	private float simulate(Tree<Data> n, int times)
 	{
@@ -270,32 +239,37 @@ public class MCTSPolicy implements Policy{
 			throw new IllegalArgumentException(
 					"The number of times to simulate should be a positive integer");
 		int winCount = 0;
-		Tree<Data> state = n;
+
 		char curRep = this.rep;
 		for(int i = 0; i < times; i++)
 		{
-			while(!hasEnded(state))
+			try
 			{
-				state = randomNextState(state,curRep);
-				curRep = (curRep == 'O')?'X':'O';
+				Tree<Data> state = treeByTree(n);
+				while(!hasEnded(state))
+				{
+					state = randomNextState(state,curRep);
+					curRep = (curRep == 'O')?'X':'O';
+				}
+				if(opponentWins(state)) winCount--;
+				else if(iWin(state)) winCount++;
+				//else do nothing
+			}catch(CloneNotSupportedException e)
+			{
+				throw new RuntimeErrorException(null, "Failed to clone tree");
 			}
-			if(opponentWins(state)) winCount--;
-			else if(iWin(state)) winCount++;
-			//else do nothing
 		}
-		return winCount / times;
+		return ((float)winCount / (float)times + 1)/2f;
 	}
 	private boolean iWin(Tree<Data> n)
 	{
 		char c = getWinner(n);
-		if(c == '_') throw new IllegalArgumentException("Game needs to be ended in order to tell who the winner is");
 		return c == this.rep;
 	}
 	private boolean opponentWins(Tree<Data> n)
 	{
 		char c = getWinner(n);
-		if(c == '_') throw new IllegalArgumentException("Game needs to be ended in order to tell who the winner is");
-		return c != this.rep;
+		return c == ((this.rep == 'X')?'O':'X');
 	}
 	/**
 	 * Some truths for the following boolean functions:
@@ -427,6 +401,11 @@ public class MCTSPolicy implements Policy{
 	public void updateRoot(Tree<Data> n)
 	{
 		tree = n;
+	}
+	public Tree<Data> treeByTree(Tree<Data> n) throws CloneNotSupportedException
+	{
+		Tree<Data> res = new Tree<Data>((Data)n.getData().clone());
+		return res;
 	}
 	/****************************************************
 	 *

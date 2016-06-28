@@ -20,7 +20,15 @@ public class Tree<T> {
     public Tree(T rootData) {
     	this(null,rootData);
     }
-    
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Object clone()
+    {
+    	ArrayList<Tree<T>> newChildren = (ArrayList<Tree<T>>) ((ArrayList) children).clone();
+    	Tree<T> res = new Tree<T>(null);
+    	return res;
+    }
     public boolean isRoot()
     {
     	return parent == this || parent == null;

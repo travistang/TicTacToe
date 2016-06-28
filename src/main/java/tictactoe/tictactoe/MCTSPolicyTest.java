@@ -28,7 +28,7 @@ public class MCTSPolicyTest {
 	public char[][] move(char[][] board,char tile,int x,int y)
 	{
 		Tree<Data> n = treeByBoard(board);
-		if(tile != 'X' || tile != 'O')
+		if(tile != 'X' && tile != 'O')
 			throw new IllegalArgumentException("The tile to be put should be either 'X' or 'O'");
 		if(x < 0 || y < 0 || x > 2 || y > 2) 
 			throw new IllegalArgumentException("The given Coordinates are invalid");
@@ -93,6 +93,17 @@ public class MCTSPolicyTest {
 		policy = new MCTSPolicy('X');
 	}
 
+	@Test
+	public void testSimulate()
+	{
+		int times = 1000;
+		char[][] board = emptyBoard.clone();
+		move(board, 'X',0,0);
+		move(board,'O',0,1);
+		move(board,'X',1,0);
+		float prob = policy.simulateTest(treeByBoard(board), times);
+		assertTrue(0 < prob && prob < 1);
+	}
 	@Test
 	public void testDecide() {
 		char[][] xwin  = {{'_','X','X'},
