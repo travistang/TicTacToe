@@ -45,7 +45,7 @@ public class MCTSPolicy implements Policy{
 	}
 	public MCTSPolicy(char rep)
 	{
-		this(rep,1);
+		this(rep,0.5f);
 	}
 	
 	public MCTSPolicy(char rep,float uctConstant)
@@ -93,7 +93,7 @@ public class MCTSPolicy implements Policy{
 		{
 			for(int j = 0; j < 3; j++)
 			{
-				if(ba[i][j] == bb[i][j])
+				if(ba[i][j] != bb[i][j])
 				{
 					int res[] = new int[2];
 					res[0] = i;
@@ -111,12 +111,10 @@ public class MCTSPolicy implements Policy{
 	 */
 	private int[] mcts(char[][] board)
 	{
-
 		for(int i = 0; i < this.nodesConsider; i++)
 		{
 			//1. selection
 			Tree<Data> selectedStage = tree;
-			tree.print();
 			while(!selectedStage.getChildren().isEmpty())
 			{
 				selectedStage = select(selectedStage);
@@ -129,6 +127,7 @@ public class MCTSPolicy implements Policy{
 			//3. Simulation
 			for(Tree<Data> child : selectedStage.getChildren())
 			{
+				
 				float prob = this.simulate(child, this.simulationTimes);
 				child.getData().prob = prob;
 				child.getData().visit();
@@ -142,6 +141,8 @@ public class MCTSPolicy implements Policy{
 		int[] res = getBoardDifference(des.getData().board,tree.getData().board);
 		if(res == null)
 			throw new RuntimeErrorException(null, "the MCTS algorithm is unable to give a decision");
+		
+		System.out.println("AI thinks it has " + this.currentWinningProbability() * 100 + "% of winning");
 		return res;
 		
 	}
@@ -211,7 +212,7 @@ public class MCTSPolicy implements Policy{
 			{
 				if(board[i][j] == '_')
 				{
-					char[][] move = board.clone();
+					char[][] move = cloneBoard(board);
 					move[i][j] = rep;
 					legalMoves.add(move);
 				}
@@ -277,6 +278,16 @@ public class MCTSPolicy implements Policy{
 	{
 		char c = getWinner(n);
 		return c == ((this.rep == 'X')?'O':'X');
+	}
+	private char[][] cloneBoard(char[][] org)
+	{
+		char res[][] = new char[3][3];
+		for(int i =0 ; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+				res[i][j] = org[i][j];
+		}
+		return res;
 	}
 	/**
 	 * Some truths for the following boolean functions:

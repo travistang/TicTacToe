@@ -58,8 +58,9 @@ public class App
 		}else // draw
 		{
 			System.out.println("Draw!");
-			show();	
+				
 		}
+		show();
 		
 	}
 	/**

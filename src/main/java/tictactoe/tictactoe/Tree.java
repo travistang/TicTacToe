@@ -65,7 +65,7 @@ public class Tree<T> {
 	    	}
     	},0);
     }
-    private void inOrderTraversal(BiConsumer<Tree<T>,Integer> func,int level)
+    public void inOrderTraversal(BiConsumer<Tree<T>,Integer> func,int level)
     {
     	func.accept(this, level);
     	for(Tree<T> node : children)
