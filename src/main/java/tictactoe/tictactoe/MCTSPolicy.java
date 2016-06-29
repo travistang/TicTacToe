@@ -1,6 +1,7 @@
 package tictactoe.tictactoe;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,8 @@ public class MCTSPolicy implements Policy{
 	private int losePenalty = 10;
 	private int winAward = 1;
 	
+	private boolean isParrallel = false;
+	
 	private static final char[][] emptyBoard() 
 	{
 		char[][] b = new char[3][3];
@@ -42,6 +45,11 @@ public class MCTSPolicy implements Policy{
 		}
 		return b;
 	};
+	
+	public void setParallel(boolean flag)
+	{
+		isParrallel = flag;
+	}
 	
 	public void setLosePenalty(int p)
 	{
@@ -85,8 +93,6 @@ public class MCTSPolicy implements Policy{
 	
 	@Override
 	public int[] decide(char[][] board) {
-		// TODO try standard MCTS Algorithm, then use Spark to solve it.
-		// TODO at the end check if it's actually faster (which is a trivial result..)
 		
 		// update the root first
 		// this will empty the tree so that a new search tree is constructed for the next move..
@@ -124,8 +130,6 @@ public class MCTSPolicy implements Policy{
 	}
 	/**
 	 * main algorithm
-	 * TODO: there's probably something wrong with the visit counts.
-	 * TODO: there may also be something wrong with the rule of selecting nodes
 	 */
 	private int[] mcts(char[][] board)
 	{
@@ -143,13 +147,12 @@ public class MCTSPolicy implements Policy{
 			this.expand(selectedStage);
 			
 			//3. Simulation
-			for(Tree<Data> child : selectedStage.getChildren())
-			{
-				
-				float prob = this.simulate(child, this.simulationTimes);
-				child.getData().prob = prob;
-				child.getData().visit();
-			}
+			// TODO: this part should be tested
+			if(isParrallel && selectedStage.getChildren().size() > 0)
+
+				this.parallelSimulation(selectedStage.getChildren());
+			else
+				this.singleSimulation(selectedStage.getChildren());
 			//4. back propagation
 			// back-up to the front
 			backPropagate(selectedStage);
@@ -287,6 +290,38 @@ public class MCTSPolicy implements Policy{
 		}
 		return ((float)winCount / (float)times + losePenalty)/(winAward + losePenalty);
 	}
+	
+	private void singleSimulation(List<Tree<Data>> children)
+	{
+		for(Tree<Data> child : children)
+		{
+			float prob = this.simulate(child, this.simulationTimes);
+			child.getData().prob = prob;
+			child.getData().visit();
+		}
+	}
+	
+	private void parallelSimulation(List<Tree<Data>> children)
+	{
+		//TODO: this
+		SparkConf conf = new SparkConf();
+		conf.setAppName("Tic Tac Toe").setMaster("spark://8.219.eduroam.dynamic.rbg.tum.de:7077");
+		JavaSparkContext spark = new JavaSparkContext(conf);
+		JavaRDD<Tree<Data>> parallelTask =  spark.parallelize(children);
+		
+		parallelTask.foreachPartition(itr ->
+		{
+			MCTSPolicy p = new MCTSPolicy(this.rep,this.uctConstant);
+			if(itr.hasNext())
+			{
+				Tree<Data> child = itr.next();				
+				child.getData().prob = p.simulate(itr.next(), simulationTimes);
+				child.getData().visit();
+			}	
+		});
+	}
+	
+	
 	private boolean iWin(Tree<Data> n)
 	{
 		char c = getWinner(n);
@@ -461,59 +496,16 @@ public class MCTSPolicy implements Policy{
 		res.getData().visitedTimes = n.getData().visitedTimes;
 		return res;
 	}
-	/****************************************************
-	 *
-	 * 
-	 * 
-	 * 
-	 * The method below are used for unit-testing the private methods
-	 * TODO remove the methods below after the testing
-	 *
-	 *
-	 *
-	 *
-	 *
-	 ****************************************************/
-	public void expandTest(Tree<Data> node)
-	{
-		expand(node);
-		
-	}
+
 	public char getRep()
 	{
 		return rep;
 	}
-	public Tree<Data> randomNextStateTest(Tree<Data> state,char rep)
-	{
-		return randomNextState(state,rep);
-	}
-	public static char getWinnerTest(Tree<Data> board)
-	{
-		return getWinner(board);
-	}
+
 	public Tree<Data> getRoot()
 	{
 		return tree;
 	}
-	public Tree<Data> bestChildrenTest(Tree<Data> n)
-	{
-		return bestChildren(n);
-	}
-	public boolean opponentWinsTest(Tree<Data> n)
-	{
-		return opponentWins(n);
-	}
-	public float simulateTest(Tree<Data> n,int times)
-	{
-		return simulate(n,times);
-	}
-	public float uctTest(Tree<Data> n)
-	{
-		return uct(n);
-	}
-	public Tree<Data> selectTest(Tree<Data> n)
-	{
-		return select(n);
-	}
+
 	
 }

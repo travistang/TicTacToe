@@ -35,8 +35,9 @@ public class App
         ai.adoptMCTSPolicy();
         MCTSPolicy p = (MCTSPolicy)(ai.getPolicy());
         p.setUCTConstant(0f);
+        p.setParallel(true);
         game.addPlayer(ai);
-        int aWins = 0, bWins = 0,total = 200;
+        int aWins = 0, bWins = 0,total = 20;
         for(int i = 0; i < total; i++)
         {
         	game.reset();
