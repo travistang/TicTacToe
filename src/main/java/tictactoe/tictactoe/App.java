@@ -25,15 +25,30 @@ public class App
     {
 		
         App game = new App();
-        game.addPlayer(new HumanPlayer("A",'X'));
+        AIPlayer a = new AIPlayer("A",'X');
+        a.adoptMCTSPolicy();
+        game.addPlayer(a);
+        
         AIPlayer ai = new AIPlayer("B",'O');
         ai.adoptMCTSPolicy();
         MCTSPolicy p = (MCTSPolicy)(ai.getPolicy());
-        p.setUCTConstant(3f);
+        p.setUCTConstant(0f);
         game.addPlayer(ai);
-        game.run();
+        
+        int aWins = 0, bWins = 0,total = 20;
+        for(int i = 0; i < total; i++)
+        {
+        	char win = game.run();
+        	if(win == 'X') aWins++;
+        	if(win == 'O') bWins++;
+        }
+        System.out.println("Statistics:");
+        System.out.println("A(random) wins: " + (float)aWins/(float)total * 100 + "%");
+        System.out.println("B(MCTS) wins: " + (float)bWins/(float)total * 100 + "%");
+        System.out.println("Draw: " + (float)(total - aWins - bWins)/(float)total * 100 + "%");
+        
     }
-	public void run()
+	public char run()
 	{
 		int[] coord;
 		while(!this.isGameEnded())
@@ -45,11 +60,18 @@ public class App
 			if(this.isGameEnded())
 			{
 				if(this.checkWin())
+				{
 					System.out.println("Player " + pa.name + " wins");
+					show();
+					return pa.representation;
+				}
 				else
+				{
 					System.out.println("Draw!");
-				show();
-				return;
+					show();
+					return '_';
+				}
+				
 			}
 			// B's turn
 			show();
@@ -59,13 +81,15 @@ public class App
 		if(checkWin()) // B wins at the end
 		{
 			System.out.println("Player " + pb.name + "wins");
-			
+			show();
+			return pb.representation;
 		}else // draw
 		{
 			System.out.println("Draw!");
+			show();
+			return '_';
 				
 		}
-		show();
 		
 	}
 	/**

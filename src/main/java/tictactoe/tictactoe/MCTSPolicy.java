@@ -277,15 +277,15 @@ public class MCTSPolicy implements Policy{
 					state = randomNextState(state,curRep);
 					curRep = (curRep == 'O')?'X':'O';
 				}
-				if(opponentWins(state)) winCount--;
-				else if(iWin(state)) winCount++;
+				if(opponentWins(state)) winCount -= losePenalty;
+				else if(iWin(state)) winCount += winAward;
 				//else do nothing
 			}catch(CloneNotSupportedException e)
 			{
 				throw new RuntimeErrorException(null, "Failed to clone tree");
 			}
 		}
-		return ((float)winCount / (float)times + 1)/2f;
+		return ((float)winCount / (float)times + losePenalty)/(winAward + losePenalty);
 	}
 	private boolean iWin(Tree<Data> n)
 	{
