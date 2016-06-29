@@ -28,6 +28,8 @@ public class App
         game.addPlayer(new HumanPlayer("A",'X'));
         AIPlayer ai = new AIPlayer("B",'O');
         ai.adoptMCTSPolicy();
+        MCTSPolicy p = (MCTSPolicy)(ai.getPolicy());
+        p.setUCTConstant(3f);
         game.addPlayer(ai);
         game.run();
     }
@@ -40,9 +42,12 @@ public class App
 			show();
 			coord = getCoord(pa);
 			data[coord[0]][coord[1]] = pa.representation;
-			if(this.checkWin())
+			if(this.isGameEnded())
 			{
-				System.out.println("Player " + pa.name + " wins");
+				if(this.checkWin())
+					System.out.println("Player " + pa.name + " wins");
+				else
+					System.out.println("Draw!");
 				show();
 				return;
 			}

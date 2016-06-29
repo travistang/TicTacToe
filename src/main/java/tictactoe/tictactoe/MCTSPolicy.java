@@ -27,13 +27,31 @@ public class MCTSPolicy implements Policy{
 	private int simulationTimes = 10000;
 	private int nodesConsider = 500;
 	
-	private static final char emptyBoard[][] = 
+	private int losePenalty = 10;
+	private int winAward = 1;
+	
+	private static final char[][] emptyBoard() 
 	{
-		{'_','_','_'},
-		{'_','_','_'},
-		{'_','_','_'}
+		char[][] b = new char[3][3];
+		for(int i = 0; i < 3; i++)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				b[i][j] = '_';
+			}
+		}
+		return b;
 	};
-
+	
+	public void setLosePenalty(int p)
+	{
+		losePenalty = p;
+	}
+	public void setWinAward(int a)
+	{
+		winAward = a;
+	}
+	
 	public void setNodesToConsider(int i)
 	{
 		nodesConsider = i;
@@ -52,7 +70,7 @@ public class MCTSPolicy implements Policy{
 	{
 		this.rep = rep;
 		this.uctConstant = uctConstant;
-		this.tree = new Tree<Data>(new Data(emptyBoard));
+		this.tree = new Tree<Data>(new Data(emptyBoard()));
 	}
 	
 	public void setUCTConstant(float c)
