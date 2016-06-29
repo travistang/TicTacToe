@@ -1,23 +1,44 @@
 package tictactoe.tictactoe;
+import java.util.ArrayList;
 import java.util.Random;
 public interface Policy {
 	public int[] decide(char[][] board);
 	
 	// randomly pick a coordinates
-	public static Policy defaultPolicy = new Policy()
+	public Policy defaultPolicy = new Policy()
 	{
 		public int[] decide(char[][] board)
 		{
-			int[] res = new int[2];
-			do
-			{
-				Random r = new Random();
-				res[0] = r.nextInt(3);
-				res[1] = r.nextInt(2);
-			}while(board[res[0]][res[1]] != '_');
+			Random r = new Random();
+			ArrayList<int[]> amoves = availableMoves(board);
 			
-			return res;
+			if(amoves.size() == 0)
+				throw new IllegalArgumentException("No moves available");
+			
+			int i = r.nextInt(amoves.size());
+			return amoves.get(i);
+		}
+		
+		private ArrayList<int[]>availableMoves(char[][] board)
+		{
+			ArrayList<int[]> moves = new ArrayList<int[]>();
+			for(int i = 0; i < 3; i++)
+			{
+				for(int j = 0; j < 3; j++)
+				{
+					if(board[i][j] == '_')
+					{
+						int[] c = new int[2];
+						c[0] = i;
+						c[1] = j;
+						moves.add(c);
+					}
+				}
+			}
+			
+			return moves;
 		}
 	};
+	
 	
 }

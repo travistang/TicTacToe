@@ -1,5 +1,7 @@
 package tictactoe.tictactoe;
 
+import java.util.Random;
+
 public class App 
 {
 	private Player pa,pb;
@@ -26,7 +28,7 @@ public class App
 		
         App game = new App();
         AIPlayer a = new AIPlayer("A",'X');
-        a.adoptMCTSPolicy();
+//        a.adoptMCTSPolicy();
         game.addPlayer(a);
         
         AIPlayer ai = new AIPlayer("B",'O');
@@ -34,19 +36,18 @@ public class App
         MCTSPolicy p = (MCTSPolicy)(ai.getPolicy());
         p.setUCTConstant(0f);
         game.addPlayer(ai);
-        
-        int aWins = 0, bWins = 0,total = 20;
+        int aWins = 0, bWins = 0,total = 200;
         for(int i = 0; i < total; i++)
         {
+        	game.reset();
         	char win = game.run();
         	if(win == 'X') aWins++;
         	if(win == 'O') bWins++;
         }
         System.out.println("Statistics:");
-        System.out.println("A(random) wins: " + (float)aWins/(float)total * 100 + "%");
-        System.out.println("B(MCTS) wins: " + (float)bWins/(float)total * 100 + "%");
-        System.out.println("Draw: " + (float)(total - aWins - bWins)/(float)total * 100 + "%");
-        
+        System.out.println("A(random) wins: " + (float)aWins/(float)total * 100 + "% aka " + aWins + " times");
+        System.out.println("B(MCTS) wins: " + (float)bWins/(float)total * 100 + "% aka " + bWins + " times");
+        System.out.println("Draw: " + (float)(total - aWins - bWins)/(float)total * 100 + "% aka " + (total - aWins - bWins) + " times");
     }
 	public char run()
 	{
@@ -161,5 +162,13 @@ public class App
     public boolean isGameEnded()
     {
     	return checkWin() || isFull();
+    }
+    public void reset()
+    {
+    	for(int i = 0; i < 3; i++)
+    	{
+    		for(int j = 0; j < 3; j++)
+    			data[i][j] = '_';
+    	}
     }
 }
